@@ -1,4 +1,18 @@
 services:
+  db:
+    container_name: postgres-db
+    image: postgres:15.3
+    environment:
+      POSTGRES_USER: loctran
+      POSTGRES_PASSWORD: Loc123456
+      PGDATA: /data/postgres
+      POSTGRES_DB: smosky
+    ports:
+      - "5433:5432"
+    restart: unless-stopped
+    extends:
+      file: common-config.yml
+      service: network-deploy-service
   rabbit:
     image: rabbitmq:3.12-management
     hostname: rabbitmq
@@ -33,6 +47,25 @@ services:
       file: common-config.yml
       service: microservice-base-config
 
+  eureka-server:
+    image: "loctran070699/eureka-server:latest"
+    container_name: eurekaserver-ms
+    ports:
+      - "8071:8071"
+    healthcheck:
+      test: "curl --fail --silent localhost:8071/actuator/health/readiness | grep UP || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    extends:
+      file: common-config.yml
+      service: microservice-eureka-config
+    environment:
+      SPRING_APPLICATION_NAME: "eureka-server"
+      SPRING_PROFILES_ACTIVE: default
+      SPRING_CONFIG_IMPORT: configserver:http://config-server:8070/
+
   boilerplate-server:
     image: "loctran070699/boilerplate-server:latest"
     container_name: boilerplate-server-ms
@@ -40,10 +73,15 @@ services:
       - "8080:8080"
     environment:
       SPRING_APPLICATION_NAME: "boilerplate-server"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/smosky
+      SPRING_PROFILES_ACTIVE: default
+      SPRING_CONFIG_IMPORT: configserver:http://config-server:8070/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8071/eureka/
     extends:
       file: common-config.yml
-      service: microservice-configserver-config
-
+      service: microservice-config-eureka-server-config
+    depends_on:
+      - db
   blog-server:
     image: "loctran070699/blog-server:latest"
     container_name: blog-server-ms
@@ -51,10 +89,15 @@ services:
       - "8081:8081"
     environment:
       SPRING_APPLICATION_NAME: "blog-server"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/smosky
+      SPRING_PROFILES_ACTIVE: default
+      SPRING_CONFIG_IMPORT: configserver:http://config-server:8070/
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8071/eureka/
     extends:
       file: common-config.yml
-      service: microservice-configserver-config
-
+      service: microservice-config-eureka-server-config
+    depends_on:
+      - db
 networks:
   smosky:
     driver: "bridge"
