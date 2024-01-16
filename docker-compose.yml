@@ -15,7 +15,7 @@ services:
       file: common-config.yml
       service: network-deploy-service
 
-  config-server:
+  configserver:
     image: "loctran070699/config-server:latest"
     container_name: configserver-ms
     ports:
